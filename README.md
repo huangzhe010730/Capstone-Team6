@@ -12,7 +12,7 @@ We used the HIPM (Health Inclusive Poverty Measure) dataset from 2023 as a case 
 
 HIPM is a measure of poverty that is specific to an individual or household's healthcare related circumstances, such as insurance type, Medicaid expansion state, benefits, resources, and more. From observing this dataset, we decided on two key data analysis questions to demonstrate good code-writing practices
 - Can we predict whether a household is in HIPM poverty based on their health needs and insurance status?
-- What else do we need to predict HIPM poverty status besides being in a state that expands Medicaid?
+- What else do we need to predict HIPM poverty status besides being in a state that has expanded Medicaid?
 
 ## Acknowledgements
 We would like to thank Dr. Emily Molfino, Open Census Lead of the US Census Bureau, for introducing us to this project and providing consistant guidance on how to best present our solution. We would also like to highlight our project advisor, Dr. Dana Yang, who was an immense support in our planning process and provided feedback to our machine learning models.
