@@ -1,0 +1,448 @@
+---
+title: "Logistic Regression"
+author: "Team 6"
+date: "`r Sys.Date()`"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(caret)
+library(ROCR)
+library(dplyr)
+```
+
+```{r}
+# Best model: Adding just unit_benefits, subsidy, moop_cap, hipm_resources
+
+# Load dataset
+df <- read.csv("~/Downloads/hipm_2023.csv")
+
+# Select variables, adding more as suggested and removing insignificant ones
+selected_vars <- c("hipm_poor", "hitype", "unit_need", "unit_benefits", "subsidy", "moop_cap", "hipm_resources")
+
+df <- df[selected_vars]
+
+# Remove rows where hitype is 13 or 15; 5, 9, 10 also had low significance with hipm_resources included
+df <- df %>% filter(!(hitype %in% c(5, 9, 10, 13, 15)))  
+
+# Convert categorical variables to factors
+df$hipm_poor <- as.factor(df$hipm_poor)
+df$subsidy <- as.factor(df$subsidy)
+df$hitype <- as.factor(df$hitype)
+
+# Check for lingering missing values
+missing_values <- sum(is.na(df))
+print(paste("Number of missing values:", missing_values))
+
+# If there are missing values, remove rows with NAs
+if (missing_values > 0) {
+  df <- na.omit(df)
+}
+
+
+# Split data into training (80%) and testing (20%) sets
+set.seed(5999)
+trainIndex <- createDataPartition(df$hipm_poor, p = 0.8, list = FALSE)
+train_data <- df[trainIndex, ]
+test_data <- df[-trainIndex, ]
+
+# Standardize numerical variables
+num_vars <- c("unit_need", "unit_benefits", "moop_cap", "hipm_resources")
+
+train_data[num_vars] <- scale(train_data[num_vars])
+test_data[num_vars] <- scale(test_data[num_vars])
+
+# Logistic Regression Model
+log_model <- glm(hipm_poor ~ hitype + unit_need + unit_benefits + moop_cap + hipm_resources,
+                 family = binomial, data = train_data)
+
+# Model Summary
+summary(log_model)
+
+# Predict probabilities on test set
+test_data$prob <- predict(log_model, newdata = test_data, type = "response")
+
+# Convert probabilities to binary predictions using 0.5 threshold
+test_data$pred <- ifelse(test_data$prob > 0.5, 1, 0)
+
+# Confusion Matrix
+conf_matrix <- table(Predicted = test_data$pred, Actual = test_data$hipm_poor)
+# Repeat this for all possible thresholds, then plot TPRs and FPRs on ROC curve later
+
+print("Confusion Matrix:")
+print(conf_matrix)
+
+# Model accuracy, precision, recall, and F1-Score
+accuracy <- sum(diag(conf_matrix)) / sum(conf_matrix)
+precision <- conf_matrix[2, 2] / sum(conf_matrix[2, ])
+recall <- conf_matrix[2, 2] / sum(conf_matrix[, 2])
+f1_score <- 2 * ((precision * recall) / (precision + recall))
+
+print(paste("Accuracy:", round(accuracy * 100, 4), "%"))
+print(paste("Precision:", round(precision, 2)))
+print(paste("Recall:", round(recall, 2)))
+print(paste("F1-Score:", round(f1_score, 2)))
+
+# ROC Curve and AUC Score: Create a prediction object using actual labels and predicted probabilities
+pred_obj <- prediction(test_data$prob, test_data$hipm_poor)
+roc_perf <- performance(pred_obj, "tpr", "fpr")
+auc <- performance(pred_obj, "auc")@y.values[[1]]
+
+# Plot ROC Curve
+plot(roc_perf, col = "blue", lwd = 2, main = "ROC Curve")
+abline(a = 0, b = 1, lty = 2, col = "red")
+text(0.6, 0.4, paste("AUC =", round(auc, 3)), col = "blue")
+
+print(paste("AUC Score:", round(auc, 3)))
+```
+```{r}
+# Just hitype + unit_need, not as good of a model
+
+df <- read.csv("~/Downloads/hipm_2023.csv")
+
+# Select relevant variables
+selected_vars <- c("hitype", "unit_need", "hipm_poor")
+df <- df[selected_vars]
+
+# Convert categorical variables to factors
+df$hitype <- as.factor(df$hitype)
+df$hipm_poor <- as.factor(df$hipm_poor)
+
+# Check for missing values
+missing_values <- sum(is.na(df))
+print(paste("Number of missing values:", missing_values))
+
+# Remove rows with missing values if any
+if (missing_values > 0) {
+  df <- na.omit(df)
+}
+
+# Split data into training (80%) and testing (20%) sets
+set.seed(5999)
+trainIndex <- createDataPartition(df$hipm_poor, p = 0.8, list = FALSE)
+train_data <- df[trainIndex, ]
+test_data <- df[-trainIndex, ]
+
+# Standardize numerical variable
+train_data$unit_need <- scale(train_data$unit_need)
+test_data$unit_need <- scale(test_data$unit_need)
+
+# Logistic Regression Model
+log_model <- glm(hipm_poor ~ hitype + unit_need, family = binomial, data = train_data)
+
+# Model Summary
+summary(log_model)
+
+# Predict probabilities on test set
+test_data$prob <- predict(log_model, newdata = test_data, type = "response")
+
+# Convert probabilities to binary predictions using a 0.5 threshold
+test_data$pred <- ifelse(test_data$prob > 0.5, 1, 0)
+
+# Confusion Matrix
+conf_matrix <- table(Predicted = test_data$pred, Actual = test_data$hipm_poor)
+
+print("Confusion Matrix:")
+print(conf_matrix) 
+# We're noticing that the model does not predict any 1's, so some metrics will not be able to be calculated
+# Also a sign of the imbalanced nature of our data
+
+# Model accuracy, precision, recall, and F1-Score metrics
+accuracy <- sum(diag(conf_matrix)) / sum(conf_matrix)
+
+# Check if model predicted at least one '1'
+if (nrow(conf_matrix) < 2) {
+    precision <- NA
+    recall <- NA
+    f1_score <- NA
+} else {
+    precision <- ifelse(sum(conf_matrix[2, ]) == 0, NA, conf_matrix[2, 2] / sum(conf_matrix[2, ]))
+    recall <- ifelse(sum(conf_matrix[, 2]) == 0, NA, conf_matrix[2, 2] / sum(conf_matrix[, 2]))
+    f1_score <- ifelse(is.na(precision) | is.na(recall) | (precision + recall) == 0, NA,
+                       2 * ((precision * recall) / (precision + recall)))
+}
+
+print(paste("Accuracy:", round(accuracy * 100, 4), "%"))
+print(paste("Precision:", ifelse(is.na(precision), "NA", round(precision, 2))))
+print(paste("Recall:", ifelse(is.na(recall), "NA", round(recall, 2))))
+print(paste("F1-Score:", ifelse(is.na(f1_score), "NA", round(f1_score, 2))))
+
+test_data$hipm_poor <- as.numeric(as.character(test_data$hipm_poor))
+pred_obj <- prediction(test_data$prob, test_data$hipm_poor)
+
+roc_perf <- performance(pred_obj, "tpr", "fpr")
+auc <- performance(pred_obj, "auc")@y.values[[1]]
+plot(roc_perf, col = "blue", lwd = 2, main = "ROC Curve")
+abline(a = 0, b = 1, lty = 2, col = "red")
+text(0.6, 0.4, paste("AUC =", round(auc, 3)), col = "blue")
+
+```
+
+
+```{r}
+# Adding unit_benefits, subsidy, moop_cap, expansion
+
+df <- read.csv("~/Downloads/hipm_2023.csv")
+
+# Select variables, adding more as suggested and removing insignificant ones
+selected_vars <- c("hipm_poor", "hitype", "unit_need", "unit_benefits", "subsidy", "moop_cap", "expansion")
+
+df <- df[selected_vars]
+
+# Remove rows where hitype is 13 or 15
+df <- df %>% filter(!(hitype %in% c(13, 15)))  
+
+# Convert categorical variables to factors
+df$hipm_poor <- as.factor(df$hipm_poor)
+df$subsidy <- as.factor(df$subsidy)
+df$hitype <- as.factor(df$hitype)
+df$expansion <- as.factor(df$expansion)
+
+# Check for missing values
+missing_values <- sum(is.na(df))
+print(paste("Number of missing values:", missing_values))
+
+# If there are missing values, remove rows with NAs
+if (missing_values > 0) {
+  df <- na.omit(df)
+}
+
+
+# Cross Validation
+set.seed(5999)
+
+trainIndex <- createDataPartition(df$hipm_poor, p = 0.8, list = FALSE)
+train_data <- df[trainIndex, ]
+test_data <- df[-trainIndex, ]
+
+# Standardize numerical variables
+num_vars <- c("unit_need", "unit_benefits", "moop_cap")
+
+train_data[num_vars] <- scale(train_data[num_vars])
+test_data[num_vars] <- scale(test_data[num_vars])
+
+# Logistic Regression Model
+log_model <- glm(hipm_poor ~ hitype + unit_need + unit_benefits + moop_cap + expansion,
+                 family = binomial, data = train_data)
+
+# Model Summary
+summary(log_model)
+
+# Predict probabilities on test set
+test_data$prob <- predict(log_model, newdata = test_data, type = "response")
+
+# Convert probabilities to binary predictions (threshold = 0.5)
+test_data$pred <- ifelse(test_data$prob > 0.5, 1, 0)
+
+# Confusion Matrix
+conf_matrix <- table(Predicted = test_data$pred, Actual = test_data$hipm_poor)
+
+print("Confusion Matrix:")
+print(conf_matrix)
+
+# Model Accuracy
+accuracy <- sum(diag(conf_matrix)) / sum(conf_matrix)
+print(paste("Accuracy:", round(accuracy * 100, 2), "%"))
+
+# Precision, Recall, and F1-Score
+precision <- conf_matrix[2, 2] / sum(conf_matrix[2, ])
+recall <- conf_matrix[2, 2] / sum(conf_matrix[, 2])
+f1_score <- 2 * ((precision * recall) / (precision + recall))
+
+print(paste("Precision:", round(precision, 2)))
+print(paste("Recall:", round(recall, 2)))
+print(paste("F1-Score:", round(f1_score, 2)))
+
+# ROC Curve and AUC Score
+pred_obj <- prediction(test_data$prob, test_data$hipm_poor)
+
+roc_perf <- performance(pred_obj, "tpr", "fpr")
+auc <- performance(pred_obj, "auc")@y.values[[1]]
+
+# Plot ROC Curve
+plot(roc_perf, col = "blue", lwd = 2, main = "ROC Curve")
+abline(a = 0, b = 1, lty = 2, col = "red")
+text(0.6, 0.4, paste("AUC =", round(auc, 3)), col = "blue")
+
+print(paste("AUC Score:", round(auc, 3)))
+
+```
+
+```{r}
+# Adding unit_benefits, subsidy, moop_cap, hipm_threshold
+
+df <- read.csv("~/Downloads/hipm_2023.csv")
+
+# Select variables, adding more as suggested and removing insignificant ones
+selected_vars <- c("hipm_poor", "hitype", "unit_need", "unit_benefits", "subsidy", "moop_cap", "hipm_threshold")
+
+df <- df[selected_vars]
+
+# Remove rows where hitype is 13 or 15; 5, 9, 10 also had low significance with hipm_resources included
+# Note: hitype 4 is kept because it has relatively high number of hipm_poor = 1
+df <- df %>% filter(!(hitype %in% c(5, 9, 10, 13, 15)))  
+
+# Convert categorical variables to factors
+df$hipm_poor <- as.factor(df$hipm_poor)
+df$subsidy <- as.factor(df$subsidy)
+df$hitype <- as.factor(df$hitype)
+
+# Check for lingering missing values
+missing_values <- sum(is.na(df))
+print(paste("Number of missing values:", missing_values))
+
+# If there are missing values, remove rows with NAs
+if (missing_values > 0) {
+  df <- na.omit(df)
+}
+
+
+# Cross Validation
+set.seed(5999)
+
+trainIndex <- createDataPartition(df$hipm_poor, p = 0.8, list = FALSE)
+train_data <- df[trainIndex, ]
+test_data <- df[-trainIndex, ]
+
+# Standardize numerical variables
+num_vars <- c("unit_need", "unit_benefits", "moop_cap", "hipm_threshold")
+
+train_data[num_vars] <- scale(train_data[num_vars])
+test_data[num_vars] <- scale(test_data[num_vars])
+
+# Logistic Regression Model
+log_model <- glm(hipm_poor ~ hitype + unit_need + unit_benefits + moop_cap + hipm_threshold,
+                 family = binomial, data = train_data)
+
+# Model Summary
+summary(log_model)
+
+# Predict probabilities on test set
+test_data$prob <- predict(log_model, newdata = test_data, type = "response")
+
+# Convert probabilities to binary predictions (threshold = 0.5)
+test_data$pred <- ifelse(test_data$prob > 0.5, 1, 0)
+
+# Confusion Matrix
+conf_matrix <- table(Predicted = test_data$pred, Actual = test_data$hipm_poor)
+
+print("Confusion Matrix:")
+print(conf_matrix)
+
+# Model Accuracy
+accuracy <- sum(diag(conf_matrix)) / sum(conf_matrix)
+print(paste("Accuracy:", round(accuracy * 100, 2), "%"))
+
+# Precision, Recall, and F1-Score
+precision <- conf_matrix[2, 2] / sum(conf_matrix[2, ])
+recall <- conf_matrix[2, 2] / sum(conf_matrix[, 2])
+f1_score <- 2 * ((precision * recall) / (precision + recall))
+
+print(paste("Precision:", round(precision, 2)))
+print(paste("Recall:", round(recall, 2)))
+print(paste("F1-Score:", round(f1_score, 2)))
+
+# ROC Curve and AUC Score
+pred_obj <- prediction(test_data$prob, test_data$hipm_poor)
+
+roc_perf <- performance(pred_obj, "tpr", "fpr")
+auc <- performance(pred_obj, "auc")@y.values[[1]]
+
+# Plot ROC Curve
+plot(roc_perf, col = "blue", lwd = 2, main = "ROC Curve")
+abline(a = 0, b = 1, lty = 2, col = "red")
+text(0.6, 0.4, paste("AUC =", round(auc, 3)), col = "blue")
+
+print(paste("AUC Score:", round(auc, 3)))
+```
+
+```{r}
+# Adding expansion + hipm_threshold + hipm_resources, probably overfitting
+
+df <- read.csv("~/Downloads/hipm_2023.csv")
+
+# Select variables, adding more as suggested and removing insignificant ones
+selected_vars <- c("hipm_poor", "hitype", "unit_need", "unit_benefits", "subsidy", "moop_cap", "expansion","hipm_threshold", "hipm_resources")
+
+df <- df[selected_vars]
+
+# Remove rows where hitype is 13 or 15
+df <- df %>% filter(!(hitype %in% c(13, 15)))  
+
+# Convert categorical variables to factors
+df$hipm_poor <- as.factor(df$hipm_poor)
+df$subsidy <- as.factor(df$subsidy)
+df$hitype <- as.factor(df$hitype)
+df$expansion <- as.factor(df$expansion)
+
+# Check for missing values
+missing_values <- sum(is.na(df))
+print(paste("Number of missing values:", missing_values))
+
+# If there are missing values, remove rows with NAs
+if (missing_values > 0) {
+  df <- na.omit(df)
+}
+
+
+# Cross Validation
+set.seed(5999)
+
+trainIndex <- createDataPartition(df$hipm_poor, p = 0.8, list = FALSE)
+train_data <- df[trainIndex, ]
+test_data <- df[-trainIndex, ]
+
+# Standardize numerical variables
+num_vars <- c("unit_need", "unit_benefits", "moop_cap", "hipm_threshold", "hipm_resources")
+
+train_data[num_vars] <- scale(train_data[num_vars])
+test_data[num_vars] <- scale(test_data[num_vars])
+
+# Logistic Regression Model
+log_model <- glm(hipm_poor ~ hitype + unit_need + unit_benefits + moop_cap + expansion + hipm_threshold + hipm_resources,
+                 family = binomial, data = train_data)
+
+# Model Summary
+summary(log_model)
+
+# Predict probabilities on test set
+test_data$prob <- predict(log_model, newdata = test_data, type = "response")
+
+# Convert probabilities to binary predictions (threshold = 0.5)
+test_data$pred <- ifelse(test_data$prob > 0.5, 1, 0)
+
+# Confusion Matrix
+conf_matrix <- table(Predicted = test_data$pred, Actual = test_data$hipm_poor)
+
+print("Confusion Matrix:")
+print(conf_matrix)
+
+# Model Accuracy
+accuracy <- sum(diag(conf_matrix)) / sum(conf_matrix)
+print(paste("Accuracy:", round(accuracy * 100, 2), "%"))
+
+# Precision, Recall, and F1-Score
+precision <- conf_matrix[2, 2] / sum(conf_matrix[2, ])
+recall <- conf_matrix[2, 2] / sum(conf_matrix[, 2])
+f1_score <- 2 * ((precision * recall) / (precision + recall))
+
+print(paste("Precision:", round(precision, 2)))
+print(paste("Recall:", round(recall, 2)))
+print(paste("F1-Score:", round(f1_score, 2)))
+
+# ROC Curve and AUC Score
+pred_obj <- prediction(test_data$prob, test_data$hipm_poor)
+
+roc_perf <- performance(pred_obj, "tpr", "fpr")
+auc <- performance(pred_obj, "auc")@y.values[[1]]
+
+# Plot ROC Curve
+plot(roc_perf, col = "blue", lwd = 2, main = "ROC Curve")
+abline(a = 0, b = 1, lty = 2, col = "red")
+text(0.6, 0.4, paste("AUC =", round(auc, 3)), col = "blue")
+
+print(paste("AUC Score:", round(auc, 3)))
+
+```
+
