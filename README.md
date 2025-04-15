@@ -15,4 +15,4 @@ HIPM is a measure of poverty that is specific to an individual or household's he
 - What else do we need to predict HIPM poverty status besides being in a state that has expanded Medicaid?
 
 ## Acknowledgements
-We would like to thank Dr. Emily Molfino, Open Census Lead of the US Census Bureau, for introducing us to this project and providing consistant guidance on how to best present our solution. We would also like to highlight our project advisor, Dr. Dana Yang, who was an immense support in our planning process and provided feedback to our machine learning models.
+We would like to thank our sponsor Dr. Emily Molfino, Open Census Lead of the US Census Bureau, for introducing us to this project and providing consistant guidance on how to best present our solution. We would also like to highlight our project advisor, Dr. Dana Yang, who was an immense support in our planning process and provided feedback to our machine learning models.
