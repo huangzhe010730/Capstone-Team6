@@ -4,6 +4,7 @@ This repository is part of our capstone project that aims to demonstrate best pr
 ## Repository Contents
 - `hipm_2023.csv`: A HIPM dataset used in our example, sourced from the US Census Bureau website
 - `EDA/`: A folder containing exploratory data analysis scripts and visualizations
+- `modeling/`: A folder with code for logistic regression, neural networks, random forest and XGBoost models to answer our key questions
 - `README.md`: This file, which introduces the purpose of the project and how to use the repository
 
 ## Data Background
